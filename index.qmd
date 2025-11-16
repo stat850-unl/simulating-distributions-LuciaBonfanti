@@ -1,6 +1,6 @@
 ---
 title: "Simulation"
-author: "Your Name Here"
+author: "Lucia Bonfanti"
 format: html
 ---
 
@@ -22,7 +22,36 @@ Remember to set your seeds for these exercises so that you get the same answer e
 
 4. What is the average error from using a $n=1000$ simulation instead of a numerical calculation for the probability that $x>1$? Write a function to calculate the error from one simulation, and evaluate that function 100 times to calculate the expected error from using a simulation estimate rather than deterministic numerical integration.
 
+```{r db-setup-r}
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
 
+set.seed(999)
+
+data <- tibble(exp = rexp(1000, rate = 3))
+
+
+#Density plot
+ ggplot(data = data, aes(x = exp)) + geom_density() + geom_function(fun=dexp, args=list(rate=3), color="red")
+ 
+#x > 1
+dataprob <- tibble(pexp(1,rate=3, lower.tail = F))
+dataprob1 <- mean(data$exp>1)
+
+# error
+set.seed(999)
+serror <- function(n = 1000, rate = 3,threshold = 1){
+sim <- rexp(n, rate = rate)
+probability  <- mean(sim > threshold)
+prob_true <- pexp(threshold, rate = rate, lower.tail = F)
+abs(probability - prob_true)}
+
+set.seed(999)
+error <- replicate(1000, serror(n = 1000, rate = 3, threshold = 1))
+av_error <- mean(error)
+```
 
 
 ## Gamma Distribution
@@ -41,13 +70,62 @@ $$f(x | \alpha, \beta) = \frac{\beta^\alpha x^{\alpha-1} e^{-x}}{\Gamma(\alpha)}
 
 1. Write a function that will calculate the MLE $\hat\alpha,\hat\beta$ from a vector $x_{samp}$ of gamma-distributed samples. Your function should have required parameter $x$ and optional parameters $\alpha,\beta$ representing the true values. The function should return a list of $\hat\alpha, \hat\beta$ and, if $\alpha,\beta$ are provided, it should also return $\alpha_{err} = \alpha-\hat\alpha$ and $\beta_{err} = \beta-\hat\beta$. 
 
-
-
-
 2. For a grid of $\alpha \times \beta=\{0.25, 0.50, 1.00, 2.00, 4.00\}\times\{0.25, 0.50, 1.00, 2.00, 4.00\}$, sample 100 values from the $\text{gamma}(\alpha,\beta)$ distribution. Provide the true parameter values and plot your error values in an appropriate plot. Take care to choose your plot mappings to support your discussion of the following: What trends (if any) do you notice in the estimation error?
 
-
 3. Now, let's vary the sample size. For $n=\{20, 30, 50, 100\}$, use your function to evaluate the error for $\alpha=1, \beta=2$. How does the error change as $n$ increases? Provide an appropriate plot as well as a description of the changes for increasing $n$. 
+```{r db-setup-r}
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(MASS)
+estimate <- function(x, alpha = NULL, beta = NULL) {
+  
+  fit <- fitdistr(x, densfun = "gamma",
+                  start = list(shape = 1, rate = 1),
+                  lower = c(0.001, 0.001))
+  
+  alpha_hat <- fit$estimate["shape"]
+  beta_hat  <- fit$estimate["rate"]
+  
+  out <- list(alpha_hat = alpha_hat,
+              beta_hat  = beta_hat)
+  
+  if (!is.null(alpha) & !is.null(beta)) {
+    out$alpha_err <- alpha - alpha_hat
+    out$beta_err  <- beta - beta_hat
+  }
+  
+  return(out)
+}
 
+#2
+alphas <- c(0.25, 0.50, 1.00, 2.00, 4.00)
+betas  <- c(0.25, 0.50, 1.00, 2.00, 4.00)
+param_grid <- expand.grid(alpha = alphas, beta = betas)
+
+set.seed(999)
+
+results <- param_grid %>%
+  rowwise() %>%
+  mutate(
+    x  = list(rgamma(100, shape = alpha, rate = beta)),
+    est = list(estimate(x[[1]], alpha, beta)),
+    alpha_hat = est$alpha_hat,
+    beta_hat  = est$beta_hat,
+    alpha_err = est$alpha_err,
+    beta_err  = est$beta_err
+  ) %>%
+  ungroup()
+
+
+ggplot(results, aes(x = alpha, y = beta, fill )) +
+  geom_tile() +
+  scale_fill_gradient2() +
+  labs(title = "Estimation Error for α (α - α̂)",
+       x = "True α", y = "True β", fill = "α Error")
+
+
+```
 
 
